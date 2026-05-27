@@ -23,6 +23,8 @@ CONFIG_KEYS = [
     "openai_api_key",
     "openai_base_url",
     "anysearch_api_key",
+    "anysearch_mcp_url",
+    "anysearch_proxy",
     "dify_base_url",
     "dify_dataset_id",
     "dify_api_key",

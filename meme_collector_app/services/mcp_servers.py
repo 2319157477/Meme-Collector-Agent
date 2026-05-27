@@ -6,6 +6,8 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
+
 try:  # Imported lazily so tests can run with mocked boundaries.
     from agents.mcp import MCPServerStreamableHttp
 except Exception:  # pragma: no cover - import environment dependent
@@ -15,6 +17,31 @@ except Exception:  # pragma: no cover - import environment dependent
 @dataclass(frozen=True)
 class McpConfig:
     anysearch_api_key: str | None = None
+    anysearch_mcp_url: str = "https://api.anysearch.com/mcp"
+    anysearch_proxy: str | None = None
+
+
+def _proxied_httpx_client_factory(proxy: str):
+    """Build the MCP HTTP client factory with an operator-supplied proxy."""
+
+    def factory(
+        headers: dict[str, str] | None = None,
+        timeout: httpx.Timeout | None = None,
+        auth: httpx.Auth | None = None,
+    ) -> httpx.AsyncClient:
+        kwargs: dict[str, Any] = {
+            "follow_redirects": True,
+            "proxy": proxy,
+        }
+        if headers is not None:
+            kwargs["headers"] = headers
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        if auth is not None:
+            kwargs["auth"] = auth
+        return httpx.AsyncClient(**kwargs)
+
+    return factory
 
 
 class McpServerBundle:
@@ -33,13 +60,19 @@ class McpServerBundle:
         if self.config.anysearch_api_key:
             anysearch_headers["Authorization"] = f"Bearer {self.config.anysearch_api_key}"
 
+        params: dict[str, Any] = {
+            "url": self.config.anysearch_mcp_url,
+            "headers": anysearch_headers,
+            "timeout": 30,
+        }
+        if self.config.anysearch_proxy:
+            params["httpx_client_factory"] = _proxied_httpx_client_factory(
+                self.config.anysearch_proxy
+            )
+
         anysearch = MCPServerStreamableHttp(
             name="anysearch",
-            params={
-                "url": "https://api.anysearch.com/mcp",
-                "headers": anysearch_headers,
-                "timeout": 30,
-            },
+            params=params,
             cache_tools_list=True,
             max_retry_attempts=2,
         )

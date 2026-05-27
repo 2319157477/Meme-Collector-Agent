@@ -8,6 +8,8 @@
   <label>OpenAI API Key <input name="openai_api_key" placeholder="已保存：{{ masked.openai_api_key or '未设置' }}"></label>
   <label>LLM Base URL <input name="openai_base_url" value="{{ masked.openai_base_url }}" placeholder="可选 OpenAI-compatible endpoint，例如 https://api.openai.com/v1"></label>
   <label>AnySearch API Key <input name="anysearch_api_key" placeholder="已保存：{{ masked.anysearch_api_key or '可匿名/未设置' }}"></label>
+  <label>AnySearch MCP URL <input name="anysearch_mcp_url" value="{{ masked.anysearch_mcp_url }}" placeholder="https://api.anysearch.com/mcp"></label>
+  <label>AnySearch Proxy <input name="anysearch_proxy" value="{{ masked.anysearch_proxy }}" placeholder="可选 http://127.0.0.1:7890"></label>
   <label>Dify Base URL <input name="dify_base_url" value="{{ masked.dify_base_url }}"></label>
   <label>Dify Dataset ID <input name="dify_dataset_id" value="{{ masked.dify_dataset_id }}"></label>
   <label>Dify API Key <input name="dify_api_key" placeholder="已保存：{{ masked.dify_api_key or '未设置' }}"></label>
