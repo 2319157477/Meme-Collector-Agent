@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None)
     openai_model: str = "gpt-5.4"
     openai_base_url: str | None = Field(default=None)
+    openai_proxy: str | None = Field(default=None)
     anysearch_api_key: str | None = Field(default=None)
     anysearch_mcp_url: str = "https://api.anysearch.com/mcp"
     anysearch_proxy: str | None = Field(default=None)

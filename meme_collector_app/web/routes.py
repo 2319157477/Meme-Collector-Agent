@@ -22,6 +22,7 @@ CONFIG_KEYS = [
     "openai_model",
     "openai_api_key",
     "openai_base_url",
+    "openai_proxy",
     "anysearch_api_key",
     "anysearch_mcp_url",
     "anysearch_proxy",
