@@ -1,0 +1,98 @@
+name: Deploy ECS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ecs
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ECS_HOST: ${{ secrets.ECS_HOST }}
+      ECS_USER: ${{ secrets.ECS_USER }}
+      ECS_PORT: ${{ secrets.ECS_PORT || '22' }}
+      ECS_DEPLOY_DIR: ${{ vars.ECS_DEPLOY_DIR || '~/meme-collector-agent' }}
+      ECS_HEALTH_URL: ${{ vars.ECS_HEALTH_URL || 'http://127.0.0.1:8000/health' }}
+      ECS_REPO_URL: ${{ vars.ECS_REPO_URL || 'https://github.com/2319157477/Meme-Collector-Agent.git' }}
+      ECS_BRANCH: ${{ vars.ECS_BRANCH || 'main' }}
+
+    steps:
+      - name: Validate required secrets
+        run: |
+          test -n "$ECS_HOST" || { echo "Missing secret ECS_HOST"; exit 1; }
+          test -n "$ECS_USER" || { echo "Missing secret ECS_USER"; exit 1; }
+          test -n "${{ secrets.ECS_SSH_PRIVATE_KEY }}" || { echo "Missing secret ECS_SSH_PRIVATE_KEY"; exit 1; }
+
+      - name: Configure SSH key
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.ECS_SSH_PRIVATE_KEY }}" > ~/.ssh/ecs_deploy_key
+          chmod 600 ~/.ssh/ecs_deploy_key
+          ssh-keyscan -p "$ECS_PORT" "$ECS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Git pull and restart Docker service on ECS
+        run: |
+          ssh -i ~/.ssh/ecs_deploy_key -p "$ECS_PORT" "$ECS_USER@$ECS_HOST" \
+            "ECS_DEPLOY_DIR='$ECS_DEPLOY_DIR' ECS_REPO_URL='$ECS_REPO_URL' ECS_BRANCH='$ECS_BRANCH' ECS_HEALTH_URL='$ECS_HEALTH_URL' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          case "$ECS_DEPLOY_DIR" in
+            "~") ECS_DEPLOY_DIR="$HOME" ;;
+            "~/"*) ECS_DEPLOY_DIR="$HOME/${ECS_DEPLOY_DIR#~/}" ;;
+          esac
+
+          if [ ! -d "$ECS_DEPLOY_DIR/.git" ]; then
+            preserve_dir="$(mktemp -d)"
+            if [ -d "$ECS_DEPLOY_DIR" ]; then
+              [ -f "$ECS_DEPLOY_DIR/.env" ] && cp "$ECS_DEPLOY_DIR/.env" "$preserve_dir/.env"
+              mv "$ECS_DEPLOY_DIR" "${ECS_DEPLOY_DIR}.pre-git.$(date +%Y%m%d%H%M%S)"
+            fi
+            mkdir -p "$(dirname "$ECS_DEPLOY_DIR")"
+            git clone --branch "$ECS_BRANCH" "$ECS_REPO_URL" "$ECS_DEPLOY_DIR"
+            [ -f "$preserve_dir/.env" ] && cp "$preserve_dir/.env" "$ECS_DEPLOY_DIR/.env"
+          fi
+
+          cd "$ECS_DEPLOY_DIR"
+          git remote set-url origin "$ECS_REPO_URL"
+          git fetch origin "$ECS_BRANCH"
+          git checkout "$ECS_BRANCH"
+          git pull --ff-only origin "$ECS_BRANCH"
+
+          [ -f .env ] || cp .env.example .env
+
+          if grep -q '^BASE_IMAGE=' .env; then
+            sed -i 's|^BASE_IMAGE=.*|BASE_IMAGE=docker.m.daocloud.io/python:3.12-slim|' .env
+          else
+            printf '\nBASE_IMAGE=docker.m.daocloud.io/python:3.12-slim\n' >> .env
+          fi
+
+          if grep -q '^PIP_INDEX_URL=' .env; then
+            sed -i 's|^PIP_INDEX_URL=.*|PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/|' .env
+          else
+            printf '\nPIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/\n' >> .env
+          fi
+
+          docker compose up --build -d
+          docker compose ps
+
+          for _ in $(seq 1 60); do
+            if curl -fsS "$ECS_HEALTH_URL"; then
+              echo
+              echo "Deploy succeeded."
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "Health check failed." >&2
+          docker compose logs --tail=120 >&2
+          exit 1
+          REMOTE

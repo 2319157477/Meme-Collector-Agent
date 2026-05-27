@@ -54,12 +54,39 @@ docker compose up --build -d
 
 SQLite data is stored in the `meme_collector_data` volume.
 
+If Docker Hub is unavailable on the ECS host, set `BASE_IMAGE` in `.env` to a reachable Python mirror image before building, for example:
+
+```env
+BASE_IMAGE=docker.m.daocloud.io/python:3.12-slim
+PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+```
+
 ### Linux ECS notes
 
 - Run the container behind the ECS security group/firewall port you choose for the WebUI.
 - Keep `.env` readable only by the deployment user because it may contain API keys.
 - Mount or keep the Docker volume on persistent disk; the SQLite DB is the source of truth for settings, tasks, runs, and pending candidates.
 - For a simple single-host deployment, restart policy `unless-stopped` is enough. Do not add multi-node scheduling unless the app is later redesigned away from SQLite.
+
+### GitHub Actions ECS deployment
+
+Pushes to `main` trigger `.github/workflows/deploy-ecs.yml`. The workflow SSHes into the ECS host, runs `git pull --ff-only`, rebuilds/restarts Docker Compose, and checks `/health`.
+
+Configure these GitHub repository secrets before enabling deployment:
+
+- `ECS_HOST`: ECS public IP or DNS name.
+- `ECS_USER`: SSH user on the ECS host.
+- `ECS_SSH_PRIVATE_KEY`: private key that can SSH to the ECS host.
+- `ECS_PORT`: optional SSH port; defaults to `22`.
+
+Optional GitHub repository variables:
+
+- `ECS_DEPLOY_DIR`: remote checkout path; defaults to `~/meme-collector-agent`.
+- `ECS_HEALTH_URL`: remote health URL; defaults to `http://127.0.0.1:8000/health`.
+- `ECS_REPO_URL`: repo URL used by ECS `git pull`; defaults to `https://github.com/2319157477/Meme-Collector-Agent.git`.
+- `ECS_BRANCH`: deploy branch; defaults to `main`.
+
+If the GitHub repository is private, make sure the ECS host can `git clone`/`git pull` the configured `ECS_REPO_URL` (for example with a deploy key).
 
 ### Docker smoke verification
 

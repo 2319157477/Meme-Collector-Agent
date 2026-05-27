@@ -1,6 +1,16 @@
 services:
   meme-collector:
-    build: .
+    build:
+      context: .
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-python:3.12-slim}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}
+        HTTP_PROXY: ""
+        HTTPS_PROXY: ""
+        ALL_PROXY: ""
+        http_proxy: ""
+        https_proxy: ""
+        all_proxy: ""
     ports:
       - "8000:8000"
     env_file:

@@ -1,0 +1,13 @@
+.git
+.omx
+__pycache__
+*.py[cod]
+*.pyo
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.env
+data
+backups
+*.sqlite3
+*.db
