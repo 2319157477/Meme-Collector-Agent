@@ -27,6 +27,8 @@ Important values:
 - `OPENAI_MODEL`: model used by the Agents SDK.
 - `OPENAI_BASE_URL`: optional OpenAI-compatible large-model endpoint base URL, for example a private gateway or proxy ending in `/v1`.
 - `ANYSEARCH_API_KEY`: optional for AnySearch search/extract tools; anonymous access is lower quota.
+- `ANYSEARCH_MCP_URL`: AnySearch MCP endpoint; defaults to `https://api.anysearch.com/mcp`.
+- `ANYSEARCH_PROXY`: optional HTTP proxy for connecting to AnySearch MCP from restricted hosts, for example `http://127.0.0.1:7890`.
 - `DIFY_BASE_URL`: defaults to `https://api.dify.ai/v1`.
 - `DIFY_DATASET_ID`: Dify knowledge base dataset id.
 - `DIFY_API_KEY`: Dify dataset API key.
@@ -68,6 +70,7 @@ PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 - Keep `.env` readable only by the deployment user because it may contain API keys.
 - Mount or keep the Docker volume on persistent disk; the SQLite DB is the source of truth for settings, tasks, runs, and pending candidates.
 - For a simple single-host deployment, restart policy `unless-stopped` is enough. Do not add multi-node scheduling unless the app is later redesigned away from SQLite.
+- If collection fails with `Failed to connect to MCP server 'anysearch'`, verify the ECS host can reach `ANYSEARCH_MCP_URL` and set `ANYSEARCH_PROXY` when outbound access requires a proxy.
 
 ### GitHub Actions ECS deployment
 

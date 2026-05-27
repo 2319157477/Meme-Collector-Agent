@@ -217,15 +217,21 @@ class CollectorFlowTests(TempDatabaseMixin, unittest.IsolatedAsyncioTestCase):
                 "openai_api_key": "sk-from-ui",
                 "openai_model": "gpt-test",
                 "openai_base_url": "https://llm.example.test/v1",
+                "anysearch_mcp_url": "https://mcp.example.test/anysearch",
+                "anysearch_proxy": "http://127.0.0.1:7890",
             }
         )
         config = load_runtime_config()
         self.assertEqual(config.openai_api_key, "sk-from-ui")
         self.assertEqual(config.openai_model, "gpt-test")
         self.assertEqual(config.openai_base_url, "https://llm.example.test/v1")
+        self.assertEqual(config.anysearch_mcp_url, "https://mcp.example.test/anysearch")
+        self.assertEqual(config.anysearch_proxy, "http://127.0.0.1:7890")
 
         agent = make_agent(config)
         self.assertEqual(agent.openai_base_url, "https://llm.example.test/v1")
+        self.assertEqual(agent.mcp_config.anysearch_mcp_url, "https://mcp.example.test/anysearch")
+        self.assertEqual(agent.mcp_config.anysearch_proxy, "http://127.0.0.1:7890")
 
     async def test_dify_dry_run_skip_env_and_saved_bool_precedence(self) -> None:
         self.assertFalse(load_runtime_config().dify_skip_check_for_dry_run)

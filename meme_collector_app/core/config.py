@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-5.4"
     openai_base_url: str | None = Field(default=None)
     anysearch_api_key: str | None = Field(default=None)
+    anysearch_mcp_url: str = "https://api.anysearch.com/mcp"
+    anysearch_proxy: str | None = Field(default=None)
 
     dify_base_url: str = "https://api.dify.ai/v1"
     dify_dataset_id: str | None = Field(default=None)

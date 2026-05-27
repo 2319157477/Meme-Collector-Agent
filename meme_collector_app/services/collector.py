@@ -18,6 +18,8 @@ class RuntimeConfig:
     openai_api_key: str | None
     openai_base_url: str | None
     anysearch_api_key: str | None
+    anysearch_mcp_url: str
+    anysearch_proxy: str | None
     dify_base_url: str
     dify_dataset_id: str | None
     dify_api_key: str | None
@@ -47,6 +49,9 @@ def load_runtime_config() -> RuntimeConfig:
         openai_api_key=pick("openai_api_key"),
         openai_base_url=pick("openai_base_url"),
         anysearch_api_key=pick("anysearch_api_key"),
+        anysearch_mcp_url=pick("anysearch_mcp_url", env.anysearch_mcp_url)
+        or env.anysearch_mcp_url,
+        anysearch_proxy=pick("anysearch_proxy"),
         dify_base_url=pick("dify_base_url", env.dify_base_url) or env.dify_base_url,
         dify_dataset_id=pick("dify_dataset_id"),
         dify_api_key=pick("dify_api_key"),
@@ -78,6 +83,8 @@ def make_agent(config: RuntimeConfig | None = None) -> OpenAIMemeAgent:
         openai_api_key=config.openai_api_key,
         openai_base_url=config.openai_base_url,
         anysearch_api_key=config.anysearch_api_key,
+        anysearch_mcp_url=config.anysearch_mcp_url,
+        anysearch_proxy=config.anysearch_proxy,
     )
 
 

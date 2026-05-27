@@ -19,6 +19,11 @@ except Exception:  # pragma: no cover - import environment dependent
     Runner = None  # type: ignore[assignment]
     OpenAIProvider = None  # type: ignore[assignment]
 
+try:
+    from agents.exceptions import UserError
+except Exception:  # pragma: no cover - older SDK or import environment dependent
+    UserError = RuntimeError  # type: ignore[assignment]
+
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "meme_extractor.md"
 
 
@@ -43,11 +48,17 @@ class OpenAIMemeAgent:
         openai_api_key: str | None,
         openai_base_url: str | None,
         anysearch_api_key: str | None,
+        anysearch_mcp_url: str,
+        anysearch_proxy: str | None,
     ) -> None:
         self.model = model
         self.openai_api_key = openai_api_key
         self.openai_base_url = openai_base_url
-        self.mcp_config = McpConfig(anysearch_api_key=anysearch_api_key)
+        self.mcp_config = McpConfig(
+            anysearch_api_key=anysearch_api_key,
+            anysearch_mcp_url=anysearch_mcp_url,
+            anysearch_proxy=anysearch_proxy,
+        )
 
     async def collect(
         self,
@@ -69,7 +80,9 @@ class OpenAIMemeAgent:
             "search_provider": "AnySearch MCP only",
             "fetch_provider": "AnySearch MCP extract only",
         }
-        async with McpServerBundle(self.mcp_config) as bundle:
+        bundle_context = McpServerBundle(self.mcp_config)
+        try:
+            bundle = await bundle_context.__aenter__()
             agent = Agent(
                 name="meme-collector",
                 model=self.model,
@@ -97,6 +110,15 @@ class OpenAIMemeAgent:
                         os.environ.pop(key, None)
                     else:
                         os.environ[key] = value
+        except (UserError, OSError) as exc:
+            raise RuntimeError(
+                "AnySearch MCP server is unreachable. Check network/DNS/firewall access to "
+                f"{self.mcp_config.anysearch_mcp_url}, or configure ANYSEARCH_PROXY / "
+                "ANYSEARCH_MCP_URL in /settings or the environment. "
+                f"Original error: {exc}"
+            ) from exc
+        finally:
+            await bundle_context.__aexit__(None, None, None)
         return parse_candidates(str(result.final_output))
 
     def _run_config(self):
