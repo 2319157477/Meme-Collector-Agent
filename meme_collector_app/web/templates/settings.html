@@ -12,6 +12,11 @@
   <label>Dify Dataset ID <input name="dify_dataset_id" value="{{ masked.dify_dataset_id }}"></label>
   <label>Dify API Key <input name="dify_api_key" placeholder="已保存：{{ masked.dify_api_key or '未设置' }}"></label>
   <label>Dify Proxy <input name="dify_proxy" value="{{ masked.dify_proxy }}" placeholder="可选 http://127.0.0.1:20171"></label>
+  <label class="inline">
+    <input name="dify_skip_check_for_dry_run" type="checkbox" {% if bool_values.dify_skip_check_for_dry_run %}checked{% endif %}>
+    测试模式：采集 dry-run 跳过 Dify 强制检查
+  </label>
+  <p class="hint">仅用于测试采集流程：启用后采集不会创建 Dify 客户端或拉取已有文档；不影响写入 Dify，且会一直保存到你取消勾选。</p>
   <button type="submit">保存配置</button>
 </form>
 {% endblock %}

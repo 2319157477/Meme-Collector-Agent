@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from meme_collector_app.core.config import get_settings, mask_secret
+from meme_collector_app.core.config import get_settings, mask_secret, parse_bool
 from meme_collector_app.db import repositories as repo
 from meme_collector_app.schemas import CandidateStatus, CollectionTaskIn, WriteResult
 from meme_collector_app.services.collector import write_approved
@@ -27,6 +27,9 @@ CONFIG_KEYS = [
     "dify_dataset_id",
     "dify_api_key",
     "dify_proxy",
+]
+BOOL_CONFIG_KEYS = [
+    "dify_skip_check_for_dry_run",
 ]
 SECRET_KEYS = {"openai_api_key", "anysearch_api_key", "dify_api_key"}
 
@@ -72,11 +75,19 @@ def settings_page(request: Request) -> HTMLResponse:
     saved = repo.get_settings_map(include_secrets=True)
     values: dict[str, str] = {}
     masked: dict[str, str] = {}
+    bool_values: dict[str, bool] = {}
     for key in CONFIG_KEYS:
         value = saved.get(key) or str(getattr(env, key, "") or "")
         values[key] = value if key not in SECRET_KEYS else ""
         masked[key] = mask_secret(value) if key in SECRET_KEYS else value
-    return _html(request, "settings.html", {"values": values, "masked": masked})
+    for key in BOOL_CONFIG_KEYS:
+        if key in saved:
+            bool_values[key] = parse_bool(saved.get(key), default=False)
+        else:
+            bool_values[key] = parse_bool(getattr(env, key, False), default=False)
+    return _html(
+        request, "settings.html", {"values": values, "masked": masked, "bool_values": bool_values}
+    )
 
 
 @router.post("/settings")
@@ -90,6 +101,8 @@ async def save_settings(request: Request) -> RedirectResponse:
             if key in current:
                 continue
         values[key] = raw
+    for key in BOOL_CONFIG_KEYS:
+        values[key] = "true" if form.get(key) else "false"
     repo.save_settings(values)
     return RedirectResponse("/settings", status_code=303)
 

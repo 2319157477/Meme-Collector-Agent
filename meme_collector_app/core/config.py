@@ -6,6 +6,9 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+TRUE_VALUES = {"1", "true", "yes", "on"}
+FALSE_VALUES = {"0", "false", "no", "off", ""}
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment and optional .env file."""
@@ -26,6 +29,7 @@ class Settings(BaseSettings):
     dify_dataset_id: str | None = Field(default=None)
     dify_api_key: str | None = Field(default=None)
     dify_proxy: str | None = Field(default=None)
+    dify_skip_check_for_dry_run: bool = False
 
 
 @lru_cache(maxsize=1)
@@ -41,3 +45,18 @@ def mask_secret(value: str | None) -> str:
     if len(value) <= 8:
         return "****"
     return f"{value[:4]}...{value[-4:]}"
+
+
+def parse_bool(value: bool | str | None, *, default: bool = False) -> bool:
+    """Parse persisted/env boolean values without relying on string truthiness."""
+
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    normalized = str(value).strip().lower()
+    if normalized in TRUE_VALUES:
+        return True
+    if normalized in FALSE_VALUES:
+        return False
+    return default

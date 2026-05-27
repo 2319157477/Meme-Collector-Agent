@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from meme_collector_app.core.config import get_settings
+from meme_collector_app.core.config import get_settings, parse_bool
 from meme_collector_app.db import repositories as repo
 from meme_collector_app.schemas import CandidateStatus, RunStatus, WriteResult
 from meme_collector_app.services.agent import MemeAgent, OpenAIMemeAgent
@@ -22,6 +22,7 @@ class RuntimeConfig:
     dify_dataset_id: str | None
     dify_api_key: str | None
     dify_proxy: str | None
+    dify_skip_check_for_dry_run: bool
 
 
 def load_runtime_config() -> RuntimeConfig:
@@ -36,6 +37,11 @@ def load_runtime_config() -> RuntimeConfig:
             return value
         return getattr(env, key, default)
 
+    def pick_bool(key: str, default: bool = False) -> bool:
+        if key in saved:
+            return parse_bool(saved.get(key), default=default)
+        return parse_bool(getattr(env, key, default), default=default)
+
     return RuntimeConfig(
         openai_model=pick("openai_model", env.openai_model) or env.openai_model,
         openai_api_key=pick("openai_api_key"),
@@ -45,6 +51,9 @@ def load_runtime_config() -> RuntimeConfig:
         dify_dataset_id=pick("dify_dataset_id"),
         dify_api_key=pick("dify_api_key"),
         dify_proxy=pick("dify_proxy"),
+        dify_skip_check_for_dry_run=pick_bool(
+            "dify_skip_check_for_dry_run", env.dify_skip_check_for_dry_run
+        ),
     )
 
 
@@ -85,8 +94,11 @@ async def run_collection(task_id: int, *, agent: MemeAgent | None = None) -> int
 
     try:
         config = load_runtime_config()
-        dify_client = make_dify_client(config)
-        existing_dify_names = await dify_client.list_documents()
+        if config.dify_skip_check_for_dry_run:
+            existing_dify_names: list[str] = []
+        else:
+            dify_client = make_dify_client(config)
+            existing_dify_names = await dify_client.list_documents()
         existing_local = repo.candidate_names_by_status()
         collector_agent = agent or make_agent(config)
         candidates = await collector_agent.collect(

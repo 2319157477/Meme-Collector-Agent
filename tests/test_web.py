@@ -55,6 +55,7 @@ class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
             settings_page = client.get("/settings")
             self.assertIn("sk-t...enai", settings_page.text)
             self.assertIn("https://llm.example.test/v1", settings_page.text)
+            self.assertIn("测试模式：采集 dry-run 跳过 Dify 强制检查", settings_page.text)
 
             task_response = client.post(
                 "/tasks",
@@ -101,6 +102,36 @@ class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
             )
             self.assertEqual(approve_response.status_code, 303)
             self.assertEqual(repo.get_candidates([candidate_id])[0]["status"], CandidateStatus.APPROVED)
+
+    def test_settings_checkbox_persists_true_and_explicit_false(self) -> None:
+        app = create_app()
+        with TestClient(app) as client:
+            enabled_response = client.post(
+                "/settings",
+                data={
+                    "openai_model": "gpt-test",
+                    "dify_base_url": "https://api.dify.ai/v1",
+                    "dify_skip_check_for_dry_run": "on",
+                },
+                follow_redirects=False,
+            )
+            self.assertEqual(enabled_response.status_code, 303)
+            self.assertEqual(repo.get_settings_map()["dify_skip_check_for_dry_run"], "true")
+            self.assertIn('name="dify_skip_check_for_dry_run" type="checkbox" checked', client.get("/settings").text)
+
+            disabled_response = client.post(
+                "/settings",
+                data={
+                    "openai_model": "gpt-test",
+                    "dify_base_url": "https://api.dify.ai/v1",
+                },
+                follow_redirects=False,
+            )
+            self.assertEqual(disabled_response.status_code, 303)
+            self.assertEqual(repo.get_settings_map()["dify_skip_check_for_dry_run"], "false")
+            settings_page = client.get("/settings").text
+            self.assertNotIn('name="dify_skip_check_for_dry_run" type="checkbox" checked', settings_page)
+            self.assertIn("不影响写入 Dify", settings_page)
 
     def test_mocked_webui_e2e_manual_run_approve_write_and_restart_persistence(self) -> None:
         fake_dify = FakeDifyClient()

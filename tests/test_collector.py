@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import unittest
 import asyncio
+import os
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from unittest.mock import patch
 
+from meme_collector_app.core.config import parse_bool
 from meme_collector_app.db import repositories as repo
 from meme_collector_app.schemas import CandidateStatus, CollectionTaskIn, MemeCandidate
 from meme_collector_app.services.collector import (
@@ -31,6 +33,14 @@ class FakeDifyClient:
 
 
 class CollectorFlowTests(TempDatabaseMixin, unittest.IsolatedAsyncioTestCase):
+    def test_parse_bool_accepts_expected_persisted_spellings(self) -> None:
+        for value in ("1", "true", "yes", "on", True):
+            self.assertTrue(parse_bool(value))
+        for value in ("0", "false", "no", "off", "", False):
+            self.assertFalse(parse_bool(value, default=True))
+        self.assertTrue(parse_bool("unexpected", default=True))
+        self.assertFalse(parse_bool("unexpected", default=False))
+
     def sample_candidate(self, name: str = "发疯文学") -> MemeCandidate:
         return MemeCandidate(
             name=name,
@@ -95,6 +105,61 @@ class CollectorFlowTests(TempDatabaseMixin, unittest.IsolatedAsyncioTestCase):
         self.assertEqual(runs[0]["id"], run_id)
         self.assertEqual(runs[0]["status"], "completed")
         self.assertEqual(fake_agent.kwargs["existing_names"], ["已存在"])
+
+    async def test_run_collection_dry_run_skip_avoids_dify_and_inserts_pending(self) -> None:
+        repo.save_settings({"dify_skip_check_for_dry_run": "true"})
+        task_id = repo.save_task(
+            CollectionTaskIn(name="test", query="q", schedule_cron="0 * * * *", max_candidates=5)
+        )
+
+        class FakeAgent:
+            async def collect(self, **kwargs):
+                self.kwargs = kwargs
+                return [self_outer.sample_candidate("测试梗")]
+
+        self_outer = self
+        fake_agent = FakeAgent()
+        with patch(
+            "meme_collector_app.services.collector.make_dify_client",
+            side_effect=AssertionError("make_dify_client must not be called in dry-run skip mode"),
+        ):
+            run_id = await run_collection(task_id, agent=fake_agent)
+
+        pending = repo.list_candidates("pending")
+        runs = repo.list_runs()
+        self.assertEqual(pending[0]["name"], "测试梗")
+        self.assertEqual(runs[0]["id"], run_id)
+        self.assertEqual(runs[0]["status"], "completed")
+        self.assertEqual(fake_agent.kwargs["existing_names"], [])
+
+    async def test_dry_run_skip_preserves_local_duplicate_protection(self) -> None:
+        repo.save_settings({"dify_skip_check_for_dry_run": "true"})
+        task_id = repo.save_task(
+            CollectionTaskIn(name="test", query="q", schedule_cron="0 * * * *", max_candidates=5)
+        )
+        repo.insert_candidate(None, self.sample_candidate("本地重复梗"))
+
+        class FakeAgent:
+            async def collect(self, **kwargs):
+                return [self_outer.sample_candidate("本地重复梗")]
+
+        self_outer = self
+        with patch(
+            "meme_collector_app.services.collector.make_dify_client",
+            side_effect=AssertionError("make_dify_client must not be called in dry-run skip mode"),
+        ):
+            await run_collection(task_id, agent=FakeAgent())
+
+        self.assertEqual(len(repo.list_candidates("pending")), 1)
+        self.assertEqual(repo.list_runs()[0]["skipped_count"], 1)
+
+    async def test_write_approved_still_requires_dify_credentials_without_fake_client(self) -> None:
+        repo.save_settings({"dify_skip_check_for_dry_run": "true"})
+        candidate_id = repo.insert_candidate(None, self.sample_candidate("写入仍需凭据"))
+        repo.update_candidate_status(candidate_id, CandidateStatus.APPROVED)
+
+        with self.assertRaisesRegex(RuntimeError, "Dify dataset id and API key are required"):
+            await write_approved([candidate_id])
 
     async def test_run_collection_skips_when_task_already_running(self) -> None:
         task_id = repo.save_task(
@@ -161,6 +226,23 @@ class CollectorFlowTests(TempDatabaseMixin, unittest.IsolatedAsyncioTestCase):
 
         agent = make_agent(config)
         self.assertEqual(agent.openai_base_url, "https://llm.example.test/v1")
+
+    async def test_dify_dry_run_skip_env_and_saved_bool_precedence(self) -> None:
+        self.assertFalse(load_runtime_config().dify_skip_check_for_dry_run)
+
+        os.environ["DIFY_SKIP_CHECK_FOR_DRY_RUN"] = "true"
+        from meme_collector_app.core.config import get_settings
+
+        get_settings.cache_clear()
+        self.assertTrue(load_runtime_config().dify_skip_check_for_dry_run)
+
+        repo.save_settings({"dify_skip_check_for_dry_run": "false"})
+        self.assertFalse(load_runtime_config().dify_skip_check_for_dry_run)
+
+        os.environ["DIFY_SKIP_CHECK_FOR_DRY_RUN"] = "false"
+        get_settings.cache_clear()
+        repo.save_settings({"dify_skip_check_for_dry_run": "true"})
+        self.assertTrue(load_runtime_config().dify_skip_check_for_dry_run)
 
 
 if __name__ == "__main__":

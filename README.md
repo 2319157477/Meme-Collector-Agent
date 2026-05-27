@@ -31,9 +31,10 @@ Important values:
 - `DIFY_DATASET_ID`: Dify knowledge base dataset id.
 - `DIFY_API_KEY`: Dify dataset API key.
 - `DIFY_PROXY`: optional HTTP proxy.
+- `DIFY_SKIP_CHECK_FOR_DRY_RUN`: testing-only flag. When `true`, collection dry-runs skip Dify credential preflight and existing-document listing; approved Dify writes still require real credentials.
 - `DATABASE_PATH`: SQLite path. In Docker it defaults to `/data/meme_collector.sqlite3`.
 
-The WebUI `/settings` page can also save/update connection settings. Secrets are masked after saving.
+The WebUI `/settings` page can also save/update connection settings. Secrets are masked after saving. The dry-run Dify skip flag is persistent until disabled and should stay off outside testing.
 
 ## Local startup
 
@@ -132,6 +133,7 @@ Restore by stopping the service, copying the saved SQLite file back into the vol
 - Collection never writes directly to Dify.
 - Automated tests use mocks/fakes and do not perform real external writes.
 - Dify writes require selected candidate IDs from the WebUI approval page.
+- `DIFY_SKIP_CHECK_FOR_DRY_RUN` only skips collection preflight/listing for tests; it does not bypass Dify write credentials or fake write success.
 - API keys are masked in the WebUI and should not be committed.
 
 ## Development verification
