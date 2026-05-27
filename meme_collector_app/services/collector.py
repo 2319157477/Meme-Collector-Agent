@@ -17,6 +17,7 @@ class RuntimeConfig:
     openai_model: str
     openai_api_key: str | None
     openai_base_url: str | None
+    openai_proxy: str | None
     anysearch_api_key: str | None
     anysearch_mcp_url: str
     anysearch_proxy: str | None
@@ -48,6 +49,7 @@ def load_runtime_config() -> RuntimeConfig:
         openai_model=pick("openai_model", env.openai_model) or env.openai_model,
         openai_api_key=pick("openai_api_key"),
         openai_base_url=pick("openai_base_url"),
+        openai_proxy=pick("openai_proxy"),
         anysearch_api_key=pick("anysearch_api_key"),
         anysearch_mcp_url=pick("anysearch_mcp_url", env.anysearch_mcp_url)
         or env.anysearch_mcp_url,
@@ -82,6 +84,7 @@ def make_agent(config: RuntimeConfig | None = None) -> OpenAIMemeAgent:
         model=config.openai_model,
         openai_api_key=config.openai_api_key,
         openai_base_url=config.openai_base_url,
+        openai_proxy=config.openai_proxy,
         anysearch_api_key=config.anysearch_api_key,
         anysearch_mcp_url=config.anysearch_mcp_url,
         anysearch_proxy=config.anysearch_proxy,

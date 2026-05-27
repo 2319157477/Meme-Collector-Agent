@@ -26,6 +26,7 @@ Important values:
 - `OPENAI_API_KEY`: required for real agent runs.
 - `OPENAI_MODEL`: model used by the Agents SDK.
 - `OPENAI_BASE_URL`: optional OpenAI-compatible large-model endpoint base URL, for example a private gateway or proxy ending in `/v1`.
+- `OPENAI_PROXY`: optional HTTP proxy for OpenAI API calls. The app does not inherit ambient `HTTP_PROXY`/`HTTPS_PROXY` for OpenAI; set this explicitly if the ECS host needs a proxy.
 - `ANYSEARCH_API_KEY`: optional for AnySearch search/extract tools; anonymous access is lower quota.
 - `ANYSEARCH_MCP_URL`: AnySearch MCP endpoint; defaults to `https://api.anysearch.com/mcp`.
 - `ANYSEARCH_PROXY`: optional HTTP proxy for connecting to AnySearch MCP from restricted hosts, for example `http://127.0.0.1:7890`.
@@ -71,6 +72,7 @@ PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 - Mount or keep the Docker volume on persistent disk; the SQLite DB is the source of truth for settings, tasks, runs, and pending candidates.
 - For a simple single-host deployment, restart policy `unless-stopped` is enough. Do not add multi-node scheduling unless the app is later redesigned away from SQLite.
 - If collection fails with `Failed to connect to MCP server 'anysearch'`, verify the ECS host can reach `ANYSEARCH_MCP_URL` and set `ANYSEARCH_PROXY` when outbound access requires a proxy.
+- If collection fails with `Connection error.` during the model call, verify the container can reach `api.openai.com` or configure `OPENAI_PROXY` to a proxy URL reachable from inside the container.
 
 ### GitHub Actions ECS deployment
 

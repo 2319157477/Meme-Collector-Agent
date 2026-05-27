@@ -217,6 +217,7 @@ class CollectorFlowTests(TempDatabaseMixin, unittest.IsolatedAsyncioTestCase):
                 "openai_api_key": "sk-from-ui",
                 "openai_model": "gpt-test",
                 "openai_base_url": "https://llm.example.test/v1",
+                "openai_proxy": "http://proxy.example.test:7890",
                 "anysearch_mcp_url": "https://mcp.example.test/anysearch",
                 "anysearch_proxy": "http://127.0.0.1:7890",
             }
@@ -225,11 +226,13 @@ class CollectorFlowTests(TempDatabaseMixin, unittest.IsolatedAsyncioTestCase):
         self.assertEqual(config.openai_api_key, "sk-from-ui")
         self.assertEqual(config.openai_model, "gpt-test")
         self.assertEqual(config.openai_base_url, "https://llm.example.test/v1")
+        self.assertEqual(config.openai_proxy, "http://proxy.example.test:7890")
         self.assertEqual(config.anysearch_mcp_url, "https://mcp.example.test/anysearch")
         self.assertEqual(config.anysearch_proxy, "http://127.0.0.1:7890")
 
         agent = make_agent(config)
         self.assertEqual(agent.openai_base_url, "https://llm.example.test/v1")
+        self.assertEqual(agent.openai_proxy, "http://proxy.example.test:7890")
         self.assertEqual(agent.mcp_config.anysearch_mcp_url, "https://mcp.example.test/anysearch")
         self.assertEqual(agent.mcp_config.anysearch_proxy, "http://127.0.0.1:7890")
 

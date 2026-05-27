@@ -17,6 +17,12 @@ services:
       - .env
     environment:
       DATABASE_PATH: /data/meme_collector.sqlite3
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
     volumes:
       - meme_collector_data:/data
     restart: unless-stopped
