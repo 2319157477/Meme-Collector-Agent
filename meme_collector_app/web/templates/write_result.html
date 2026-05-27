@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}写入结果 - Meme Collector{% endblock %}
+{% block content %}
+<h2>Dify 写入结果</h2>
+<p>成功：{{ result.success }} | 跳过：{{ result.skipped }} | 失败：{{ result.failed }}</p>
+<ul>
+{% for message in result.messages %}<li>{{ message }}</li>{% else %}<li>无消息</li>{% endfor %}
+</ul>
+<a class="button" href="/pending">返回待审核</a>
+{% endblock %}

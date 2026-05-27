@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}首页 - Meme Collector{% endblock %}
+{% block content %}
+<section class="grid">
+  <article>
+    <h2>任务</h2>
+    <p>当前任务数：{{ tasks|length }}</p>
+    <a class="button" href="/tasks">管理任务</a>
+  </article>
+  <article>
+    <h2>待审核</h2>
+    <p>待审核候选：{{ pending|length }}</p>
+    <a class="button" href="/pending">审核热梗</a>
+  </article>
+  <article>
+    <h2>最近运行</h2>
+    <ul>
+    {% for run in runs %}
+      <li>#{{ run['id'] }} {{ run['status'] }} - {{ run['started_at'] }}</li>
+    {% else %}
+      <li>暂无运行记录</li>
+    {% endfor %}
+    </ul>
+  </article>
+</section>
+{% endblock %}

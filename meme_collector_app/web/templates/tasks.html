@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}任务 - Meme Collector{% endblock %}
+{% block content %}
+<h2>新建/更新采集任务</h2>
+<form method="post" class="form-card">
+  <label>任务 ID（留空新建）<input name="task_id" placeholder="更新已有任务时填写"></label>
+  <label>名称 <input name="name" value="默认热梗收集"></label>
+  <label>搜索主题 <input name="query" value="最近一周网络热梗 盘点"></label>
+  <label>Cron <input name="schedule_cron" value="0 */12 * * *"></label>
+  <label>Freshness <input name="freshness" value="week"></label>
+  <label>最大候选数 <input name="max_candidates" type="number" min="1" max="50" value="20"></label>
+  <label class="inline"><input name="enabled" type="checkbox" checked> 启用</label>
+  <button type="submit">保存任务</button>
+</form>
+
+<h2>任务列表</h2>
+<table>
+  <tr><th>ID</th><th>名称</th><th>Query</th><th>Cron</th><th>启用</th><th>操作</th></tr>
+  {% for task in tasks %}
+  <tr>
+    <td>{{ task['id'] }}</td>
+    <td>{{ task['name'] }}</td>
+    <td>{{ task['query'] }}</td>
+    <td>{{ task['schedule_cron'] }}</td>
+    <td>{{ '是' if task['enabled'] else '否' }}</td>
+    <td><form method="post" action="/tasks/{{ task['id'] }}/run"><button type="submit">立即运行</button></form></td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6">暂无任务</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}
