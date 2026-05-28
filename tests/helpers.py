@@ -18,10 +18,18 @@ class TempDatabaseMixin:
                 "DIFY_SKIP_CHECK_FOR_DRY_RUN",
                 "DIFY_DATASET_ID",
                 "DIFY_API_KEY",
+                "ADMIN_USERNAME",
+                "ADMIN_PASSWORD",
+                "JWT_SECRET",
+                "APP_ENV",
             )
         }
         self.tmpdir = tempfile.TemporaryDirectory()
         os.environ["DATABASE_PATH"] = str(Path(self.tmpdir.name) / "test.sqlite3")
+        os.environ["APP_ENV"] = "test"
+        os.environ["ADMIN_USERNAME"] = "admin"
+        os.environ["ADMIN_PASSWORD"] = "admin-pass"
+        os.environ["JWT_SECRET"] = "test-jwt-secret-that-is-long-enough"
         os.environ.pop("DIFY_SKIP_CHECK_FOR_DRY_RUN", None)
         os.environ.pop("DIFY_DATASET_ID", None)
         os.environ.pop("DIFY_API_KEY", None)

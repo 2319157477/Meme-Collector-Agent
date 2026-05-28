@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}登录 - Meme Collector{% endblock %}
+{% block content %}
+<section class="auth-card">
+  <div class="eyebrow">Admin Login</div>
+  <h2>登录热梗采集控制台</h2>
+  <p class="hint">请输入环境变量配置的单管理员账号。开发环境默认 admin / admin。</p>
+  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+  <form method="post" action="/login" class="form-grid">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label>用户名 <input name="username" autocomplete="username" autofocus></label>
+    <label>密码 <input name="password" type="password" autocomplete="current-password"></label>
+    <button type="submit">登录</button>
+  </form>
+</section>
+{% endblock %}

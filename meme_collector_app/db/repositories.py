@@ -90,6 +90,12 @@ def save_task(task: CollectionTaskIn, task_id: int | None = None) -> int:
         return int(cursor.lastrowid)
 
 
+def delete_task(task_id: int) -> bool:
+    with connect() as conn:
+        cursor = conn.execute("DELETE FROM collection_tasks WHERE id = ?", (task_id,))
+        return cursor.rowcount > 0
+
+
 def create_run(task_id: int | None, status: str = "running") -> int:
     with connect() as conn:
         cursor = conn.execute(

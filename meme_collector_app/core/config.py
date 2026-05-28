@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     dify_proxy: str | None = Field(default=None)
     dify_skip_check_for_dry_run: bool = False
 
+    admin_username: str = "admin"
+    admin_password: str | None = Field(default=None)
+    jwt_secret: str | None = Field(default=None)
+    jwt_cookie_name: str = "meme_collector_auth"
+    jwt_ttl_minutes: int = 480
+    csrf_cookie_name: str = "meme_collector_csrf"
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

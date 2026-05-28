@@ -7,16 +7,31 @@
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
-  <header>
-    <h1>热梗采集服务</h1>
-    <nav>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark">梗</span>
+      <div>
+        <h1>热梗采集控制台</h1>
+        <p>采集、审核并安全写入 Dify 知识库</p>
+      </div>
+    </div>
+    {% if current_username %}
+    <nav class="main-nav" aria-label="主导航">
       <a href="/">首页</a>
-      <a href="/settings">配置</a>
       <a href="/tasks">任务</a>
-      <a href="/runs">运行记录</a>
       <a href="/pending">待审核</a>
+      <a href="/runs">运行记录</a>
+      <a href="/settings">配置</a>
     </nav>
+    <form class="logout-form" method="post" action="/logout">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <span>{{ current_username }}</span>
+      <button class="button ghost" type="submit">退出</button>
+    </form>
+    {% endif %}
   </header>
-  <main>{% block content %}{% endblock %}</main>
+  <main class="page-shell">
+    {% block content %}{% endblock %}
+  </main>
 </body>
 </html>

@@ -37,8 +37,12 @@ Important values:
 - `DIFY_PROXY`: optional HTTP proxy.
 - `DIFY_SKIP_CHECK_FOR_DRY_RUN`: testing-only flag. When `true`, collection dry-runs skip Dify credential preflight and existing-document listing; approved Dify writes still require real credentials.
 - `DATABASE_PATH`: SQLite path. In Docker it defaults to `/data/meme_collector.sqlite3`.
+- `ADMIN_USERNAME` / `ADMIN_PASSWORD`: single-admin WebUI login. Development defaults to `admin` / `admin` only when unset. Set real values for deployed hosts.
+- `JWT_SECRET`: signing secret for the WebUI JWT cookie and CSRF token. Required outside development; use a long random value.
+- `JWT_TTL_MINUTES`: optional login lifetime; defaults to 480 minutes.
+- `JWT_COOKIE_NAME` / `CSRF_COOKIE_NAME`: optional cookie names for the auth JWT and CSRF token.
 
-The WebUI `/settings` page can also save/update connection settings. Secrets are masked after saving. The dry-run Dify skip flag is persistent until disabled and should stay off outside testing.
+The WebUI is protected by a single-admin login. `/health` stays public for deployment checks. The `/settings` page can save/update connection settings after login. OpenAI/AnySearch/Dify secrets are masked after saving; admin credentials and JWT secret are environment-only and are not editable from the WebUI. The dry-run Dify skip flag is persistent until disabled and should stay off outside testing.
 
 ## Local startup
 
@@ -127,8 +131,8 @@ Restore by stopping the service, copying the saved SQLite file back into the vol
 ## Operational flow
 
 1. Configure OpenAI, AnySearch, and Dify in `/settings`.
-2. Create a scheduled task in `/tasks` or click "立即运行" for a manual run.
-3. Collection runs search/fetch/extract and saves candidates as `pending`.
+2. Log in to the WebUI, then create a scheduled task in `/tasks` with the schedule panel or click "立即运行" for a manual run.
+3. Existing custom cron values remain supported, but normal task creation uses the schedule panel instead of hand-written cron. Collection runs search/fetch/extract and saves candidates as `pending`.
 4. Review candidates and source links in `/pending`.
 5. Approve selected candidates.
 6. Select approved candidates and click "写入选中已批准项到 Dify".
@@ -141,6 +145,8 @@ Restore by stopping the service, copying the saved SQLite file back into the vol
 - Dify writes require selected candidate IDs from the WebUI approval page.
 - `DIFY_SKIP_CHECK_FOR_DRY_RUN` only skips collection preflight/listing for tests; it does not bypass Dify write credentials or fake write success.
 - API keys are masked in the WebUI and should not be committed.
+- The auth JWT cookie is HTTP-only and mutating WebUI forms include CSRF protection.
+- `/health` is intentionally public; WebUI pages and form actions require login.
 
 ## Development verification
 

@@ -1,58 +1,45 @@
 {% extends "base.html" %}
 {% block title %}待审核 - Meme Collector{% endblock %}
 {% block content %}
-<h2>待审核候选</h2>
+<section class="page-title"><div><div class="eyebrow">Review</div><h2>候选审核</h2><p>先批准候选，再手动选择已批准项写入 Dify。</p></div></section>
+
+<section class="panel">
+<h3>待审核候选</h3>
 <form method="post" action="/pending/approve">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <div class="candidate-list">
   {% for item in pending %}
     <article class="candidate">
-      <label class="inline"><input type="checkbox" name="candidate_id" value="{{ item['id'] }}"> #{{ item['id'] }} {{ item['name'] }}（置信度 {{ '%.2f'|format(item['confidence']) }}）</label>
-      {% if item.source_urls %}
-      <p>来源：
-        {% for url in item.source_urls %}
-          <a href="{{ url }}" target="_blank" rel="noreferrer">{{ loop.index }}</a>
-        {% endfor %}
-      </p>
-      {% endif %}
+      <label class="inline candidate-title"><input type="checkbox" name="candidate_id" value="{{ item['id'] }}"><strong>#{{ item['id'] }} {{ item['name'] }}</strong><span class="badge pending">置信度 {{ '%.2f'|format(item['confidence']) }}</span></label>
+      {% if item.source_urls %}<p class="sources">来源：{% for url in item.source_urls %}<a href="{{ url }}" target="_blank" rel="noreferrer">来源 {{ loop.index }}</a>{% endfor %}</p>{% endif %}
       <details><summary>Markdown 预览</summary><pre>{{ item['markdown'] }}</pre></details>
     </article>
-  {% else %}
-    <p>暂无 pending 候选。</p>
-  {% endfor %}
+  {% else %}<p class="empty">暂无 pending 候选。</p>{% endfor %}
   </div>
   <button type="submit">批准选中项</button>
-  <button type="submit" formmethod="post" formaction="/pending/reject">拒绝选中项</button>
+  <button class="secondary" type="submit" formmethod="post" formaction="/pending/reject">拒绝选中项</button>
 </form>
+</section>
 
-<h2>已批准待写入</h2>
+<section class="panel">
+<h3>已批准待写入</h3>
 <form method="post" action="/write">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <div class="candidate-list">
   {% for item in approved %}
     <article class="candidate">
-      <label class="inline"><input type="checkbox" name="candidate_id" value="{{ item['id'] }}"> #{{ item['id'] }} {{ item['name'] }}（置信度 {{ '%.2f'|format(item['confidence']) }}）</label>
-      {% if item.source_urls %}
-      <p>来源：
-        {% for url in item.source_urls %}
-          <a href="{{ url }}" target="_blank" rel="noreferrer">{{ loop.index }}</a>
-        {% endfor %}
-      </p>
-      {% endif %}
+      <label class="inline candidate-title"><input type="checkbox" name="candidate_id" value="{{ item['id'] }}"><strong>#{{ item['id'] }} {{ item['name'] }}</strong><span class="badge approved">approved</span></label>
+      {% if item.source_urls %}<p class="sources">来源：{% for url in item.source_urls %}<a href="{{ url }}" target="_blank" rel="noreferrer">来源 {{ loop.index }}</a>{% endfor %}</p>{% endif %}
       <details><summary>Markdown 预览</summary><pre>{{ item['markdown'] }}</pre></details>
     </article>
-  {% else %}
-    <p>暂无 approved 候选。</p>
-  {% endfor %}
+  {% else %}<p class="empty">暂无 approved 候选。</p>{% endfor %}
   </div>
   <button type="submit">写入选中已批准项到 Dify</button>
 </form>
+</section>
 
-<h2>失败项</h2>
-<ul>
-{% for item in failed %}<li>#{{ item['id'] }} {{ item['name'] }} - {{ item['error'] }}</li>{% else %}<li>无</li>{% endfor %}
-</ul>
-
-<h2>最近已写入</h2>
-<ul>
-{% for item in written %}<li>#{{ item['id'] }} {{ item['name'] }} - {{ item['dify_document_id'] or 'duplicate/unknown' }}</li>{% else %}<li>无</li>{% endfor %}
-</ul>
+<section class="grid two-col">
+  <article class="panel"><h3>失败项</h3><ul>{% for item in failed %}<li>#{{ item['id'] }} {{ item['name'] }} - {{ item['error'] }}</li>{% else %}<li>无</li>{% endfor %}</ul></article>
+  <article class="panel"><h3>最近已写入</h3><ul>{% for item in written %}<li>#{{ item['id'] }} {{ item['name'] }} - {{ item['dify_document_id'] or 'duplicate/unknown' }}</li>{% else %}<li>无</li>{% endfor %}</ul></article>
+</section>
 {% endblock %}

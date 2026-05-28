@@ -1,24 +1,27 @@
 {% extends "base.html" %}
 {% block title %}配置 - Meme Collector{% endblock %}
 {% block content %}
-<h2>连接配置</h2>
-<p class="hint">Secret 留空会保留已保存值；页面只显示脱敏值。</p>
-<form method="post" class="form-card">
-  <label>OpenAI Model <input name="openai_model" value="{{ masked.openai_model }}"></label>
-  <label>OpenAI API Key <input name="openai_api_key" placeholder="已保存：{{ masked.openai_api_key or '未设置' }}"></label>
-  <label>LLM Base URL <input name="openai_base_url" value="{{ masked.openai_base_url }}" placeholder="可选 OpenAI-compatible endpoint，例如 https://api.openai.com/v1"></label>
-  <label>OpenAI Proxy <input name="openai_proxy" value="{{ masked.openai_proxy }}" placeholder="可选 http://127.0.0.1:7890"></label>
-  <label>AnySearch API Key <input name="anysearch_api_key" placeholder="已保存：{{ masked.anysearch_api_key or '可匿名/未设置' }}"></label>
-  <label>AnySearch MCP URL <input name="anysearch_mcp_url" value="{{ masked.anysearch_mcp_url }}" placeholder="https://api.anysearch.com/mcp"></label>
-  <label>AnySearch Proxy <input name="anysearch_proxy" value="{{ masked.anysearch_proxy }}" placeholder="可选 http://127.0.0.1:7890"></label>
-  <label>Dify Base URL <input name="dify_base_url" value="{{ masked.dify_base_url }}"></label>
-  <label>Dify Dataset ID <input name="dify_dataset_id" value="{{ masked.dify_dataset_id }}"></label>
-  <label>Dify API Key <input name="dify_api_key" placeholder="已保存：{{ masked.dify_api_key or '未设置' }}"></label>
-  <label>Dify Proxy <input name="dify_proxy" value="{{ masked.dify_proxy }}" placeholder="可选 http://127.0.0.1:20171"></label>
-  <label class="inline">
-    <input name="dify_skip_check_for_dry_run" type="checkbox" {% if bool_values.dify_skip_check_for_dry_run %}checked{% endif %}>
-    测试模式：采集 dry-run 跳过 Dify 强制检查
-  </label>
+<section class="page-title"><div><div class="eyebrow">Settings</div><h2>连接配置</h2><p>Secret 留空会保留已保存值；页面只显示脱敏值。</p></div></section>
+<form method="post" class="form-card wide">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <fieldset><legend>OpenAI</legend>
+    <label>Model <input name="openai_model" value="{{ masked.openai_model }}"></label>
+    <label>API Key <input name="openai_api_key" placeholder="已保存：{{ masked.openai_api_key or '未设置' }}"></label>
+    <label>Base URL <input name="openai_base_url" value="{{ masked.openai_base_url }}" placeholder="可选 OpenAI-compatible endpoint"></label>
+    <label>Proxy <input name="openai_proxy" value="{{ masked.openai_proxy }}" placeholder="可选 http://127.0.0.1:7890"></label>
+  </fieldset>
+  <fieldset><legend>AnySearch</legend>
+    <label>API Key <input name="anysearch_api_key" placeholder="已保存：{{ masked.anysearch_api_key or '可匿名/未设置' }}"></label>
+    <label>MCP URL <input name="anysearch_mcp_url" value="{{ masked.anysearch_mcp_url }}"></label>
+    <label>Proxy <input name="anysearch_proxy" value="{{ masked.anysearch_proxy }}" placeholder="可选 http://127.0.0.1:7890"></label>
+  </fieldset>
+  <fieldset><legend>Dify</legend>
+    <label>Base URL <input name="dify_base_url" value="{{ masked.dify_base_url }}"></label>
+    <label>Dataset ID <input name="dify_dataset_id" value="{{ masked.dify_dataset_id }}"></label>
+    <label>API Key <input name="dify_api_key" placeholder="已保存：{{ masked.dify_api_key or '未设置' }}"></label>
+    <label>Proxy <input name="dify_proxy" value="{{ masked.dify_proxy }}" placeholder="可选 http://127.0.0.1:20171"></label>
+  </fieldset>
+  <label class="inline check"><input name="dify_skip_check_for_dry_run" type="checkbox" {% if bool_values.dify_skip_check_for_dry_run %}checked{% endif %}> 测试模式：采集 dry-run 跳过 Dify 强制检查</label>
   <p class="hint">仅用于测试采集流程：启用后采集不会创建 Dify 客户端或拉取已有文档；不影响写入 Dify，且会一直保存到你取消勾选。</p>
   <button type="submit">保存配置</button>
 </form>

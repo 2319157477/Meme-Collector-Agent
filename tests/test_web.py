@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import unittest
 from unittest.mock import patch
 
@@ -7,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from meme_collector_app.db import repositories as repo
 from meme_collector_app.main import create_app
-from meme_collector_app.schemas import CandidateStatus, MemeCandidate
+from meme_collector_app.schemas import CandidateStatus, CollectionTaskIn, MemeCandidate
 from tests.helpers import TempDatabaseMixin
 
 
@@ -25,21 +26,104 @@ class FakeDifyClient:
         return "doc-web-e2e"
 
 
+class FakeScheduler:
+    def __init__(self) -> None:
+        self.reloads = 0
+        self.runs: list[int] = []
+
+    def reload_jobs(self) -> None:
+        self.reloads += 1
+
+    async def run_now(self, task_id: int) -> int:
+        self.runs.append(task_id)
+        return task_id
+
+
+def csrf_from(html: str) -> str:
+    match = re.search(r'name="csrf_token" value="([^"]+)"', html)
+    if not match:
+        raise AssertionError("csrf token not found")
+    return match.group(1)
+
+
+def login(client: TestClient, target: str = "/") -> str:
+    response = client.post(
+        "/login",
+        data={"username": "admin", "password": "admin-pass", "next": target},
+        follow_redirects=False,
+    )
+    if response.status_code != 303:
+        raise AssertionError(response.text)
+    page = client.get(target)
+    if page.status_code != 200:
+        raise AssertionError(page.text)
+    return csrf_from(page.text)
+
+
 class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
-    def test_health_and_homepage(self) -> None:
+    def test_health_public_and_homepage_requires_login(self) -> None:
         app = create_app()
         with TestClient(app) as client:
             self.assertEqual(client.get("/health").json(), {"status": "ok"})
+            response = client.get("/", follow_redirects=False)
+            self.assertEqual(response.status_code, 303)
+            self.assertIn("/login", response.headers["location"])
+
+            login(client)
             response = client.get("/")
             self.assertEqual(response.status_code, 200)
-            self.assertIn("热梗采集服务", response.text)
+            self.assertIn("热梗采集控制台", response.text)
+            self.assertIn("运营概览", response.text)
+
+
+    def test_login_next_url_rejects_external_redirect(self) -> None:
+        app = create_app()
+        with TestClient(app) as client:
+            response = client.post(
+                "/login",
+                data={"username": "admin", "password": "admin-pass", "next": "//evil.test"},
+                follow_redirects=False,
+            )
+            self.assertEqual(response.status_code, 303)
+            self.assertEqual(response.headers["location"], "/")
+
+    def test_login_rejects_invalid_credentials_and_logout_clears_cookie(self) -> None:
+        app = create_app()
+        with TestClient(app) as client:
+            bad = client.post(
+                "/login",
+                data={"username": "admin", "password": "wrong", "next": "/"},
+            )
+            self.assertEqual(bad.status_code, 200)
+            self.assertIn("用户名或密码不正确", bad.text)
+            self.assertNotIn("meme_collector_auth", client.cookies)
+
+            csrf = login(client)
+            self.assertIn("meme_collector_auth", client.cookies)
+            logout = client.post("/logout", data={"csrf_token": csrf}, follow_redirects=False)
+            self.assertEqual(logout.status_code, 303)
+            self.assertNotIn("meme_collector_auth", client.cookies)
+
+    def test_csrf_required_for_mutating_actions(self) -> None:
+        app = create_app()
+        with TestClient(app) as client:
+            login(client, "/settings")
+            response = client.post(
+                "/settings",
+                data={"openai_model": "gpt-test"},
+                follow_redirects=False,
+            )
+            self.assertEqual(response.status_code, 403)
+            self.assertEqual(repo.get_settings_map(), {})
 
     def test_settings_task_and_review_flow(self) -> None:
         app = create_app()
         with TestClient(app) as client:
+            csrf = login(client, "/settings")
             settings_response = client.post(
                 "/settings",
                 data={
+                    "csrf_token": csrf,
                     "openai_model": "gpt-test",
                     "openai_api_key": "sk-test-openai",
                     "openai_base_url": "https://llm.example.test/v1",
@@ -56,13 +140,16 @@ class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
             self.assertIn("sk-t...enai", settings_page.text)
             self.assertIn("https://llm.example.test/v1", settings_page.text)
             self.assertIn("测试模式：采集 dry-run 跳过 Dify 强制检查", settings_page.text)
+            csrf = csrf_from(settings_page.text)
 
             task_response = client.post(
                 "/tasks",
                 data={
+                    "csrf_token": csrf,
                     "name": "任务",
                     "query": "最近一周网络热梗",
-                    "schedule_cron": "0 * * * *",
+                    "schedule_kind": "every_hours",
+                    "interval_hours": "1",
                     "freshness": "week",
                     "max_candidates": "10",
                     "enabled": "on",
@@ -71,6 +158,7 @@ class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
             )
             self.assertEqual(task_response.status_code, 303)
             self.assertEqual(len(repo.list_tasks()), 1)
+            self.assertEqual(repo.list_tasks()[0]["schedule_cron"], "0 */1 * * *")
 
             candidate_id = repo.insert_candidate(
                 None,
@@ -94,21 +182,120 @@ class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
             )
             pending_page = client.get("/pending")
             self.assertIn("https://example.com/a", pending_page.text)
+            csrf = csrf_from(pending_page.text)
 
             approve_response = client.post(
                 "/pending/approve",
-                data={"candidate_id": str(candidate_id)},
+                data={"csrf_token": csrf, "candidate_id": str(candidate_id)},
                 follow_redirects=False,
             )
             self.assertEqual(approve_response.status_code, 303)
-            self.assertEqual(repo.get_candidates([candidate_id])[0]["status"], CandidateStatus.APPROVED)
+            status = repo.get_candidates([candidate_id])[0]["status"]
+            self.assertEqual(status, CandidateStatus.APPROVED)
+
+    def test_task_direct_edit_delete_and_scheduler_reload(self) -> None:
+        app = create_app()
+        fake_scheduler = FakeScheduler()
+        with TestClient(app) as client:
+            app.state.scheduler_service = fake_scheduler
+            csrf = login(client, "/tasks")
+            create_response = client.post(
+                "/tasks",
+                data={
+                    "csrf_token": csrf,
+                    "name": "旧任务",
+                    "query": "旧 query",
+                    "schedule_kind": "daily",
+                    "daily_time": "08:30",
+                    "freshness": "week",
+                    "max_candidates": "5",
+                    "enabled": "on",
+                },
+                follow_redirects=False,
+            )
+            self.assertEqual(create_response.status_code, 303)
+            task = repo.list_tasks()[0]
+            self.assertEqual(task["schedule_cron"], "30 8 * * *")
+            self.assertEqual(fake_scheduler.reloads, 1)
+
+            csrf = csrf_from(client.get("/tasks").text)
+            edit_response = client.post(
+                "/tasks",
+                data={
+                    "csrf_token": csrf,
+                    "task_id": str(task["id"]),
+                    "name": "新任务",
+                    "query": "新 query",
+                    "schedule_kind": "weekly",
+                    "weekly_day": "fri",
+                    "weekly_time": "18:45",
+                    "freshness": "day",
+                    "max_candidates": "7",
+                    "enabled": "on",
+                },
+                follow_redirects=False,
+            )
+            self.assertEqual(edit_response.status_code, 303)
+            edited = repo.get_task(task["id"])
+            self.assertIsNotNone(edited)
+            self.assertEqual(edited["name"], "新任务")
+            self.assertEqual(edited["schedule_cron"], "45 18 * * fri")
+            self.assertEqual(fake_scheduler.reloads, 2)
+
+            run_id = repo.create_run(task["id"], "completed")
+            csrf = csrf_from(client.get("/tasks").text)
+            delete_response = client.post(
+                f"/tasks/{task['id']}/delete",
+                data={"csrf_token": csrf, "confirm_delete": str(task["id"])},
+                follow_redirects=False,
+            )
+            self.assertEqual(delete_response.status_code, 303)
+            self.assertIsNone(repo.get_task(task["id"]))
+            self.assertEqual(fake_scheduler.reloads, 3)
+            runs_page = client.get("/runs")
+            self.assertIn(f"#{run_id}", runs_page.text)
+            self.assertIn("<td>-</td>", runs_page.text)
+
+    def test_legacy_custom_cron_renders_and_invalid_schedule_rejected(self) -> None:
+        repo.save_task(
+            task=CollectionTaskIn(
+                name="Legacy",
+                query="q",
+                schedule_cron="15 10 1 * *",
+                max_candidates=5,
+            )
+        )
+        app = create_app()
+        with TestClient(app) as client:
+            csrf = login(client, "/tasks")
+            tasks_page = client.get("/tasks")
+            self.assertIn("legacy/custom", tasks_page.text)
+            self.assertIn("15 10 1 * *", tasks_page.text)
+            response = client.post(
+                "/tasks",
+                data={
+                    "csrf_token": csrf,
+                    "name": "Bad",
+                    "query": "q",
+                    "schedule_kind": "custom",
+                    "custom_cron": "bad cron",
+                    "max_candidates": "5",
+                    "freshness": "week",
+                    "enabled": "on",
+                },
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("无效定时规则", response.text)
+            self.assertEqual(len(repo.list_tasks()), 1)
 
     def test_settings_checkbox_persists_true_and_explicit_false(self) -> None:
         app = create_app()
         with TestClient(app) as client:
+            csrf = login(client, "/settings")
             enabled_response = client.post(
                 "/settings",
                 data={
+                    "csrf_token": csrf,
                     "openai_model": "gpt-test",
                     "dify_base_url": "https://api.dify.ai/v1",
                     "dify_skip_check_for_dry_run": "on",
@@ -117,11 +304,14 @@ class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
             )
             self.assertEqual(enabled_response.status_code, 303)
             self.assertEqual(repo.get_settings_map()["dify_skip_check_for_dry_run"], "true")
-            self.assertIn('name="dify_skip_check_for_dry_run" type="checkbox" checked', client.get("/settings").text)
+            page = client.get("/settings").text
+            self.assertIn('name="dify_skip_check_for_dry_run" type="checkbox" checked', page)
+            csrf = csrf_from(page)
 
             disabled_response = client.post(
                 "/settings",
                 data={
+                    "csrf_token": csrf,
                     "openai_model": "gpt-test",
                     "dify_base_url": "https://api.dify.ai/v1",
                 },
@@ -130,7 +320,9 @@ class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
             self.assertEqual(disabled_response.status_code, 303)
             self.assertEqual(repo.get_settings_map()["dify_skip_check_for_dry_run"], "false")
             settings_page = client.get("/settings").text
-            self.assertNotIn('name="dify_skip_check_for_dry_run" type="checkbox" checked', settings_page)
+            self.assertNotIn(
+                'name="dify_skip_check_for_dry_run" type="checkbox" checked', settings_page
+            )
             self.assertIn("不影响写入 Dify", settings_page)
 
     def test_mocked_webui_e2e_manual_run_approve_write_and_restart_persistence(self) -> None:
@@ -164,13 +356,18 @@ class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
 
         app = create_app()
         with (
-            patch("meme_collector_app.services.scheduler.run_collection", side_effect=fake_run_collection),
+            patch(
+                "meme_collector_app.services.scheduler.run_collection",
+                side_effect=fake_run_collection,
+            ),
             patch("meme_collector_app.services.collector.make_dify_client", return_value=fake_dify),
             TestClient(app) as client,
         ):
+            csrf = login(client, "/settings")
             settings_response = client.post(
                 "/settings",
                 data={
+                    "csrf_token": csrf,
                     "openai_model": "gpt-test",
                     "openai_api_key": "sk-e2e-openai",
                     "openai_base_url": "https://llm.example.test/v1",
@@ -183,13 +380,16 @@ class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
                 follow_redirects=False,
             )
             self.assertEqual(settings_response.status_code, 303)
+            csrf = csrf_from(client.get("/tasks").text)
 
             task_response = client.post(
                 "/tasks",
                 data={
+                    "csrf_token": csrf,
                     "name": "E2E 任务",
                     "query": "最近一周网络热梗",
-                    "schedule_cron": "0 * * * *",
+                    "schedule_kind": "every_hours",
+                    "interval_hours": "1",
                     "freshness": "week",
                     "max_candidates": "5",
                     "enabled": "on",
@@ -198,24 +398,29 @@ class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
             )
             self.assertEqual(task_response.status_code, 303)
             task_id = repo.list_tasks()[0]["id"]
+            csrf = csrf_from(client.get("/tasks").text)
 
-            run_response = client.post(f"/tasks/{task_id}/run", follow_redirects=False)
+            run_response = client.post(
+                f"/tasks/{task_id}/run", data={"csrf_token": csrf}, follow_redirects=False
+            )
             self.assertEqual(run_response.status_code, 303)
             pending_page = client.get("/pending")
             self.assertIn("端到端热梗", pending_page.text)
             self.assertIn("https://example.com/e2e", pending_page.text)
+            csrf = csrf_from(pending_page.text)
 
             candidate_id = repo.list_candidates("pending")[0]["id"]
             approve_response = client.post(
                 "/pending/approve",
-                data={"candidate_id": str(candidate_id)},
+                data={"csrf_token": csrf, "candidate_id": str(candidate_id)},
                 follow_redirects=False,
             )
             self.assertEqual(approve_response.status_code, 303)
+            csrf = csrf_from(client.get("/pending").text)
 
             write_response = client.post(
                 "/write",
-                data={"candidate_id": str(candidate_id)},
+                data={"csrf_token": csrf, "candidate_id": str(candidate_id)},
             )
             self.assertEqual(write_response.status_code, 200)
             self.assertIn("doc-web-e2e", write_response.text)
@@ -225,6 +430,7 @@ class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
 
         restarted_app = create_app()
         with TestClient(restarted_app) as restarted:
+            login(restarted, "/tasks")
             self.assertIn("E2E 任务", restarted.get("/tasks").text)
             settings_after_restart = restarted.get("/settings").text
             self.assertIn("sk-e...enai", settings_after_restart)
@@ -232,7 +438,8 @@ class WebSmokeTests(TempDatabaseMixin, unittest.TestCase):
             pending_after_restart = restarted.get("/pending")
             self.assertIn("端到端热梗", pending_after_restart.text)
             self.assertIn("doc-web-e2e", pending_after_restart.text)
-            self.assertEqual(repo.get_candidates([candidate_id])[0]["status"], CandidateStatus.WRITTEN)
+            written_status = repo.get_candidates([candidate_id])[0]["status"]
+            self.assertEqual(written_status, CandidateStatus.WRITTEN)
 
 
 if __name__ == "__main__":

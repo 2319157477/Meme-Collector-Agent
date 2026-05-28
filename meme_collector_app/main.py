@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from meme_collector_app.core.config import get_settings
 from meme_collector_app.db.models import init_db
 from meme_collector_app.services.scheduler import create_scheduler_service
+from meme_collector_app.web.auth import validate_auth_config
 from meme_collector_app.web.routes import router
 
 
@@ -27,6 +28,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    validate_auth_config()
     app = FastAPI(title="Meme Collector Agent", lifespan=lifespan)
     app.include_router(router)
     app.mount("/static", StaticFiles(directory="meme_collector_app/web/static"), name="static")
