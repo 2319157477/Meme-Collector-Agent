@@ -47,7 +47,7 @@ jobs:
 
           case "$ECS_DEPLOY_DIR" in
             "~") ECS_DEPLOY_DIR="$HOME" ;;
-            "~/"*) ECS_DEPLOY_DIR="$HOME/${ECS_DEPLOY_DIR#~/}" ;;
+            "~/"*) ECS_DEPLOY_DIR="$HOME/${ECS_DEPLOY_DIR#\~/}" ;;
           esac
 
           if [ ! -d "$ECS_DEPLOY_DIR/.git" ]; then
