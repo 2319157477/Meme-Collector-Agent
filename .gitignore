@@ -1,5 +1,7 @@
 .omx/
 .omc/
+.claude/
+.codex/
 
 # Python
 __pycache__/
