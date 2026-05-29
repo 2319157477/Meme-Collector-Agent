@@ -28,6 +28,8 @@ class DeploymentArtifactTests(unittest.TestCase):
         self.assertIn("GitHub Actions ECS deployment", readme)
         self.assertIn("git pull --ff-only", workflow)
         self.assertIn("docker compose up --build -d", workflow)
+        self.assertIn("ECS_STATIC_URL", workflow)
+        self.assertIn("/static/app.css", workflow)
         self.assertIn("docker compose -p", docker_smoke_sh)
         self.assertIn("curl -fsS", docker_smoke_sh)
         self.assertIn("meme_collector.sqlite3", docker_smoke_sh)

@@ -20,6 +20,7 @@ jobs:
       ECS_PORT: ${{ secrets.ECS_PORT || '22' }}
       ECS_DEPLOY_DIR: ${{ vars.ECS_DEPLOY_DIR || '~/meme-collector-agent' }}
       ECS_HEALTH_URL: ${{ vars.ECS_HEALTH_URL || 'http://127.0.0.1:8000/health' }}
+      ECS_STATIC_URL: ${{ vars.ECS_STATIC_URL || 'http://127.0.0.1:8000/static/app.css' }}
       ECS_REPO_URL: ${{ vars.ECS_REPO_URL || 'https://github.com/2319157477/Meme-Collector-Agent.git' }}
       ECS_BRANCH: ${{ vars.ECS_BRANCH || 'main' }}
 
@@ -41,7 +42,7 @@ jobs:
       - name: Git pull and restart Docker service on ECS
         run: |
           ssh -i ~/.ssh/ecs_deploy_key -p "$ECS_PORT" "$ECS_USER@$ECS_HOST" \
-            "ECS_DEPLOY_DIR='$ECS_DEPLOY_DIR' ECS_REPO_URL='$ECS_REPO_URL' ECS_BRANCH='$ECS_BRANCH' ECS_HEALTH_URL='$ECS_HEALTH_URL' bash -s" <<'REMOTE'
+            "ECS_DEPLOY_DIR='$ECS_DEPLOY_DIR' ECS_REPO_URL='$ECS_REPO_URL' ECS_BRANCH='$ECS_BRANCH' ECS_HEALTH_URL='$ECS_HEALTH_URL' ECS_STATIC_URL='$ECS_STATIC_URL' bash -s" <<'REMOTE'
           set -euo pipefail
 
           case "$ECS_DEPLOY_DIR" in
@@ -84,7 +85,7 @@ jobs:
           docker compose ps
 
           for _ in $(seq 1 60); do
-            if curl -fsS "$ECS_HEALTH_URL"; then
+            if curl -fsS "$ECS_HEALTH_URL" >/dev/null && curl -fsS "$ECS_STATIC_URL" | grep -q ':root'; then
               echo
               echo "Deploy succeeded."
               exit 0
